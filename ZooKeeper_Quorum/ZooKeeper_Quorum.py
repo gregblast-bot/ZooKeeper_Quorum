@@ -82,8 +82,26 @@ class ElectionMaster(object):
                 
                 # If leader, update key-value pair and propogate to replicas
                 if self.detectLeader(childrens):
-                    self.data_store[key] = value
-                    self.propagate_update(self.data_store)
+                    # For a size of N nodes, a quorom requires votes from at least Nw members. Where Nw >= N/2 + 1.
+                    N = len(self.replicas)
+                    Nw = (N // 2) + 1 # Perform floor division
+
+                    # Get votes from replicas
+                    votes = 0
+                    for replica in self.replicas:
+                        url = f"http://{replica}/vote"
+                        response = requests.get(url)
+                        if response:
+                            votes += 1
+                    print(f"\033[34mVotes: {votes}\033[0m")
+
+                    # If we have the required amount of votes, commit the changes to self and replicas.
+                    if Nw >= votes:
+                        self.data_store[key] = value
+                        self.propagate_update(self.data_store)
+                        print(f"\033[34mAdd/Update response: Success\033[0m")
+                    else:
+                        print(f"\033[34mAdd/Update response: Error - Quorum not achieved\033[0m")
                 else:
                     print(f"\033[33mOnly leader can add/update key-value pairs. Sending request to leader.\033[0m")
                     self.host_seq_list = [i.split("_") for i in childrens]
@@ -96,7 +114,7 @@ class ElectionMaster(object):
                 print(f"\033[31mPath {self.leadernode} does not exist.\033[0m")
 
         except Exception as e:
-            print(f"\033[31mError in add_update: {e}\033[0m")
+            print(f"\033[31mError in add_update: {e}\033[0m")       
 
     # Propagate key-value pair to replicas
     def propagate(self, data_store):
@@ -138,11 +156,17 @@ def propagate():
     detector.propagate(data_store)
     return jsonify({"status": "propagated"})
 
-# Define PUT method route for finding leader to kill
+# Define GET method route for finding leader to kill
 @app.route('/kill', methods=['GET'])
 def kill():
     is_leader =  detector.kill()
     return jsonify({"is_leader": is_leader})
+
+# Define GET method route for finding leader to kill
+@app.route('/vote', methods=['GET'])
+def vote():
+    vote = True
+    return jsonify({"vote": vote})
 
 # Main method
 if __name__ == '__main__':

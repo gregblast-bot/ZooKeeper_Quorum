@@ -59,8 +59,17 @@ def main():
         servers = [start_server(host, port, zookeeper_ip, zookeeper_port) for port in ports]
 
         print("\033[32mTesting Add and Read...\033[0m")
-        # All updates routed through server on the elected leader. Sending through port 500 as default.
+        # All updates routed through server on the elected leader. Sending through port 5000 as default.
         add_update(host, ports[0], f"key0", f"value0")
+
+        for i in range(3):
+            for j in range(3):
+                print(f"\033[36mFor Port: {ports[i]}\033[0m")
+                read_key(host, ports[i], f"key{j}") # Check existing keys on all ports
+
+        print("\033[32mTesting Add and Read Through Replicas...\033[0m")
+        # All updates routed through server on the elected leader. Sending through port 5002.
+        add_update(host, ports[2], f"key2", f"value2")
 
         for i in range(3):
             for j in range(3):
