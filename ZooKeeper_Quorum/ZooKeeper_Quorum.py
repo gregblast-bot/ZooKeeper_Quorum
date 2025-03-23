@@ -7,6 +7,7 @@ import os
 import operator
 import requests
 import signal
+import random
 
 # Create a Flask app instance
 app = Flask(__name__)
@@ -24,7 +25,8 @@ class ElectionMaster(object):
                                                         func=self.detectLeader)
         self.zk.start()
         self.host_seq_list = []
-        self.data_store = {}  # Dictionary to store key-value pairs
+        self.data_store = {}  # Dictionary to store key-value pairs and a version associated with it
+        self.version = 0
         self.replicas = []  # List of replica addresses
 
     # Destructor
@@ -53,6 +55,8 @@ class ElectionMaster(object):
             return True
         else:
             print(f"\033[33mI am a worker: {self.client_id}\033[0m")
+            # Convert sorted_host_seqvalue back to the desired string format
+            self.replicas = [f"{host}" for host, _ in sorted_host_seqvalue[1:]]
             return False
     
     # Propogate updates to replicas
@@ -71,7 +75,50 @@ class ElectionMaster(object):
 
     # Return the value for the key in the dictionary, otherwise return empty string
     def read(self, key):
-        return self.data_store.get(key, "")
+        # Check replicas
+        print(f"\033[33mChecking replicas during read: {self.replicas}\033[0m")
+        # For a size of N nodes, a quorom requires votes from at least Nw members. Where Nw >= N/2 + 1.
+        N = len(self.replicas)
+        Nw = (N // 2) + 1 # Perform floor division
+        valuesArr = []
+        Nr = random.sample(self.replicas, Nw) # Randomly select Nr replicas
+        count = len(Nr)
+        print(f"Replica count = {count}")
+        i = 0
+        timeout = 30
+
+        # Track the start time
+        start_time = time.time()
+
+        # Repeat until replicas reach an agreement
+        while True:
+            # Check if timeout has been exceeded
+            elapsed_time = time.time() - start_time
+            if elapsed_time > timeout:
+                print("\033[31mTimeout reached! Exiting read operation.\033[0m")
+                break # Break out of the loop
+
+            for replica in Nr:
+                try:
+                    value =  self.data_store.get(key, "")
+                    valuesArr.append(value)
+
+                    # Process when we iterate to the last replica
+                    if i == count-1:
+                        values = [value[0] if value else None for value in valuesArr] 
+                        versions = [version[1] if version else None for version in valuesArr] 
+                        if len(set(values)) <= 1 and len(set(versions)) <= 1:
+                            print(f"\033[33mValues/Versions: {valuesArr}\033[0m")
+                            print(f"\033[33mValues: {values}\033[0m")
+                            print(f"\033[33mVersions: {versions}\033[0m")
+                            print(f"\033[34mQuorom reached. Updating data_store.\033[0m")
+                            return self.data_store.get(key, "")
+                        else:
+                            print(f"\033[34mRead response: Conflict - Retrying\033[0m")
+                    i += 1
+
+                except requests.exceptions.RequestException as e:
+                    print(f"\033[31mError reading value for {replica}: {e}\033[0m")
 
     # Add or update a key-value pair
     def add_update(self, key, value):
@@ -97,7 +144,8 @@ class ElectionMaster(object):
 
                     # If we have the required amount of votes, commit the changes to self and replicas.
                     if Nw >= votes:
-                        self.data_store[key] = value
+                        self.version = self.version + 1
+                        self.data_store[key] = value, self.version
                         self.propagate_update(self.data_store)
                         print(f"\033[34mAdd/Update response: Success\033[0m")
                     else:
