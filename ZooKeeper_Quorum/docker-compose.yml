@@ -8,7 +8,7 @@ services:
     environment:
       - ALLOW_ANONYMOUS_LOGIN=yes
       - ZOO_SERVER_ID=1
-      - ZOO_SERVERS=0.0.0.0:2888:3888,zk2:2888:3888,zk3:2888:3888,z4:2888:3888,zk5:2888:3888,zk6:2888:3888,z7:2888:3888,zk8:2888:3888,zk9:2888:3888 # ports for internal communication, P2P comms and leader election ensemble
+      - ZOO_SERVERS=0.0.0.0:2888:3888,zk2:2888:3888,zk3:2888:3888 # ports for internal communication, P2P comms and leader election ensemble
   zk2:
     container_name: zk2
     hostname: zk2
@@ -18,7 +18,7 @@ services:
     environment:
       - ALLOW_ANONYMOUS_LOGIN=yes
       - ZOO_SERVER_ID=2
-      - ZOO_SERVERS=zk1:2888:3888,0.0.0.0:2888:3888,zk3:2888:3888,z4:2888:3888,zk5:2888:3888,zk6:2888:3888,z7:2888:3888,zk8:2888:3888,zk9:2888:3888 # ports for internal communication, P2P comms and leader election ensemble
+      - ZOO_SERVERS=zk1:2888:3888,0.0.0.0:2888:3888,zk3:2888:3888 # ports for internal communication, P2P comms and leader election ensemble
   zk3:
     container_name: zk3
     hostname: zk3
@@ -28,7 +28,7 @@ services:
     environment:
       - ALLOW_ANONYMOUS_LOGIN=yes
       - ZOO_SERVER_ID=3
-      - ZOO_SERVERS=zk1:2888:3888,zk2:2888:3888,0.0.0.0:2888:3888,z4:2888:3888,zk5:2888:3888,zk6:2888:3888,z7:2888:3888,zk8:2888:3888,zk9:2888:3888 # ports for internal communication, P2P comms and leader election ensemble
+      - ZOO_SERVERS=zk1:2888:3888,zk2:2888:3888,0.0.0.0:2888:3888 # ports for internal communication, P2P comms and leader election ensemble
   # zk4:
   #   container_name: zk4
   #   hostname: zk4

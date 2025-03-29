@@ -46,6 +46,13 @@ def kill(host, port):
     print(f"\033[34mKill response: {response.json()}\033[0m")
     return response.json()
 
+# Send request and print timeout response
+def timeout(host, port):
+    url = f"http://{host}:{port}/timeout"
+    response = requests.get(url)
+    print(f"\033[34mTimeout response: {response.json()}\033[0m")
+    return response.json()
+
 # Main method
 def main():
     zookeeper_ip = "127.0.0.1"
@@ -63,8 +70,8 @@ def main():
         # All updates routed through server on the elected leader. Sending through port 5000 as default.
         add_update(host, ports[0], f"key0", f"value0")
 
-        for i in range(ports.count):
-            for j in range(ports.count):
+        for i in range(len(ports)):
+            for j in range(len(ports)):
                 print(f"\033[36mFor Port: {ports[i]}\033[0m")
                 read_key(host, ports[i], f"key{j}") # Check existing keys on all ports
 
@@ -72,8 +79,8 @@ def main():
         # All updates routed through server on the elected leader. Sending through port 5002.
         add_update(host, ports[2], f"key2", f"value2")
 
-        for i in range(ports.count):
-            for j in range(ports.count):
+        for i in range(len(ports)):
+            for j in range(len(ports)):
                 print(f"\033[36mFor Port: {ports[i]}\033[0m")
                 read_key(host, ports[i], f"key{j}") # Check existing keys on all ports
 
@@ -86,17 +93,20 @@ def main():
                 stop_server(server)
                 time.sleep(30)  # Wait for new leader election
                 start_server(host, port, zookeeper_ip, zookeeper_port)
+                print("\033[32mTesting Timeout Logic.\033[0m")
+                timeout(host, port) # Enable server timeout.
+
 
         print("\033[32mTesting Stale Read...\033[0m")
-        for i in range(ports.count):
-            for j in range(ports.count):
+        for i in range(len(ports)):
+            for j in range(len(ports)):
                 print(f"\033[36mFor Port: {ports[i]}\033[0m")
                 read_key(host, ports[i], f"key{j}") # Check existing keys on all ports, old leader shoud be empty
         time.sleep(10)
-        for i in range(ports.count):
+        for i in range(len(ports)):
             add_update(host, ports[i], f"key{i}", f"value{i}") # All updates routed through server on some elected leader, update all
-        for i in range(ports.count):
-            for j in range(ports.count):
+        for i in range(len(ports)):
+            for j in range(len(ports)):
                 print(f"\033[36mFor Port: {ports[i]}\033[0m")
                 read_key(host, ports[i], f"key{j}") # Check existing keys on all ports
 

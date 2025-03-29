@@ -181,6 +181,21 @@ class ElectionMaster(object):
             print(f"\033[33mI am a helpless worker to keep alive: {self.client_id}\033[0m")
             return False
 
+    # Timeout for testing
+    def timeout(self):
+        timeout = 10
+
+        # Track the start time
+        start_time = time.time()
+
+        # Repeat until replicas reach an agreement
+        while True:
+            # Check if timeout has been exceeded
+            elapsed_time = time.time() - start_time
+            if elapsed_time > timeout:
+                print("\033[31mTimeout reached! Exiting read operation.\033[0m")
+                break # Break out of the loop
+
 # Define GET method route for reading a key-value pair
 @app.route('/read', methods=['GET'])
 def read():
@@ -197,7 +212,7 @@ def update():
     detector.add_update(key, value)
     return jsonify({"status": "updated"})
 
-# Define PUT method route for finding leader to kill
+# Define PUT method route for propogating data
 @app.route('/propagate', methods=['POST'])
 def propagate():
     data = request.get_json()
@@ -211,7 +226,13 @@ def kill():
     is_leader =  detector.kill()
     return jsonify({"is_leader": is_leader})
 
-# Define GET method route for finding leader to kill
+# Define GET method route for testing a timeout
+@app.route('/timeout', methods=['GET'])
+def timeout():
+    detector.timeout()
+    return jsonify({"status": "timeout complete"})
+
+# Define GET method route for getting votes
 @app.route('/vote', methods=['GET'])
 def vote():
     vote = True
