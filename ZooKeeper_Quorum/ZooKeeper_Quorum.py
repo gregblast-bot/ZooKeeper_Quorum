@@ -37,6 +37,7 @@ class ElectionMaster(object):
     # Create a zookeeper node
     def create_node(self):
         node_path = self.zk.create(os.path.join(self.leadernode, "%s_" % self.client_id), b"host:", ephemeral=True, sequence=True, makepath=True)
+        #self.propagate_update(self.data_store)
         print(f"\033[33mCreated node: {node_path}\033[0m")
 
     # Detect the leader depending on the smallest sequence number

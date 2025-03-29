@@ -52,6 +52,7 @@ def main():
     zookeeper_port = "21811"
     host = "127.0.0.1"
     ports = ["5000", "5001", "5002"]
+    #ports = ["5000", "5001", "5002", "5003", "5004", "5005", "5006", "5007", "5008"]
 
     try:
         start_docker()
@@ -62,8 +63,8 @@ def main():
         # All updates routed through server on the elected leader. Sending through port 5000 as default.
         add_update(host, ports[0], f"key0", f"value0")
 
-        for i in range(3):
-            for j in range(3):
+        for i in range(ports.count):
+            for j in range(ports.count):
                 print(f"\033[36mFor Port: {ports[i]}\033[0m")
                 read_key(host, ports[i], f"key{j}") # Check existing keys on all ports
 
@@ -71,8 +72,8 @@ def main():
         # All updates routed through server on the elected leader. Sending through port 5002.
         add_update(host, ports[2], f"key2", f"value2")
 
-        for i in range(3):
-            for j in range(3):
+        for i in range(ports.count):
+            for j in range(ports.count):
                 print(f"\033[36mFor Port: {ports[i]}\033[0m")
                 read_key(host, ports[i], f"key{j}") # Check existing keys on all ports
 
@@ -87,15 +88,15 @@ def main():
                 start_server(host, port, zookeeper_ip, zookeeper_port)
 
         print("\033[32mTesting Stale Read...\033[0m")
-        for i in range(3):
-            for j in range(3):
+        for i in range(ports.count):
+            for j in range(ports.count):
                 print(f"\033[36mFor Port: {ports[i]}\033[0m")
                 read_key(host, ports[i], f"key{j}") # Check existing keys on all ports, old leader shoud be empty
         time.sleep(10)
-        for i in range(3):
+        for i in range(ports.count):
             add_update(host, ports[i], f"key{i}", f"value{i}") # All updates routed through server on some elected leader, update all
-        for i in range(3):
-            for j in range(3):
+        for i in range(ports.count):
+            for j in range(ports.count):
                 print(f"\033[36mFor Port: {ports[i]}\033[0m")
                 read_key(host, ports[i], f"key{j}") # Check existing keys on all ports
 
