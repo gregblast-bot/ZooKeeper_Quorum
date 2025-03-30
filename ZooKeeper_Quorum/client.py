@@ -70,27 +70,27 @@ def main():
         # All updates routed through server on the elected leader. Sending through port 5000 as default.
         add_update(host, ports[0], f"key0", f"value0")
 
-        #time.sleep(10) # Wait for server to update
+        #time.sleep(10) # Wait for testing
 
         for i in range(len(ports)):
             for j in range(len(ports)):
                 print(f"\033[36mFor Port: {ports[i]}\033[0m")
                 read_key(host, ports[i], f"key{j}") # Check existing keys on all ports
 
-        #time.sleep(10) # Wait for server to update
+        #time.sleep(10) # Wait for testing
 
         print("\033[32mTesting Add and Read Through Replicas...\033[0m")
         # All updates routed through server on the elected leader. Sending through port 5002.
         add_update(host, ports[2], f"key2", f"value2")
 
-        #time.sleep(10) # Wait for server to update
+        #time.sleep(10) # Wait for testing
 
         for i in range(len(ports)):
             for j in range(len(ports)):
                 print(f"\033[36mFor Port: {ports[i]}\033[0m")
                 read_key(host, ports[i], f"key{j}") # Check existing keys on all ports
 
-        #time.sleep(10) # Wait for server to update
+        #time.sleep(10) # Wait for testing
 
         killReplica = False
         for port, server in servers:
@@ -103,9 +103,13 @@ def main():
                 killReplica = True
                 start_server(host, port, zookeeper_ip, zookeeper_port)
                 print("\033[33mReading from replica.\033[0m")
-                read_key(host, port, f"key0") # Read from killed replica
-                read_key(host, port, f"key1") # Read from killed replica
-                read_key(host, port, f"key2") # Read from killed replica
+                read_key(host, port, f"key0") # Read from killed replica before data restored
+                read_key(host, port, f"key1") # Read from killed replica before data restored
+                read_key(host, port, f"key2") # Read from killed replica before data restored
+                time.sleep(20) # Wait for server to update
+                read_key(host, port, f"key0") # Read from killed replica after data restored
+                read_key(host, port, f"key1") # Read from killed replica after data restored
+                read_key(host, port, f"key2") # Read from killed replica after data restored
 
         for port, server in servers:
             response = kill(host, port)

@@ -30,6 +30,7 @@ class ElectionMaster(object):
         self.version = 0
         self.replicas = []  # List of replica addresses
         self.heartbeat_started = False  # Add flag to track if heartbeat has started
+        self.count = 0
 
     # Destructor
     def __del__(self):
@@ -53,12 +54,13 @@ class ElectionMaster(object):
             # Convert sorted_host_seqvalue back to the desired string format
             self.replicas = [f"{host}" for host, _ in sorted_host_seqvalue[1:]]
             print(f"\033[35mHeartbeat Started: {self.heartbeat_started}\033[0m")
-            if not self.heartbeat_started:
+            if not self.heartbeat_started and self.count == 1:
                 # Starting heartbeat in a separate thread for leader
                 print(f"\033[35mStarting Heartbeat thread.\033[0m")
                 heartbeat_thread = threading.Thread(target=self.heartbeat, args=(self.replicas,), daemon=True)
                 heartbeat_thread.start()
                 self.heartbeat_started = True
+            self.count += 1
             return True
         else:
             print(f"\033[33mI am a worker: {self.client_id}\033[0m")
@@ -88,15 +90,6 @@ class ElectionMaster(object):
 
     # Return the value for the key in the dictionary, otherwise return empty string
     def read(self, key):
-        # Check replicas
-        print(f"\033[33mChecking replicas during read: {self.replicas}\033[0m")
-        # For a size of N nodes, a quorom requires votes from at least Nw members. Where Nw >= N/2 + 1.
-        N = len(self.replicas)
-        Nw = min((N // 2) + 1, N) # Perform floor division
-        valuesArr = []
-        Nr = random.sample(self.replicas, Nw) # Randomly select Nr replicas
-        count = len(Nr)
-        print(f"Replica count = {count}")
         i = 0
         timeout = 30
 
@@ -105,6 +98,16 @@ class ElectionMaster(object):
 
         # Repeat until replicas reach an agreement
         while True:
+            # Check replicas
+            print(f"\033[33mChecking replicas during read: {self.replicas}\033[0m")
+            # For a size of N nodes, a quorom requires votes from at least Nw members. Where Nw >= N/2 + 1.
+            N = len(self.replicas)
+            Nw = min((N // 2) + 1, N) # Perform floor division
+            valuesArr = []
+            Nr = random.sample(self.replicas, Nw) # Randomly select Nr replicas
+            count = len(Nr)
+            print(f"Replica count = {count}")
+
             # Check if timeout has been exceeded
             elapsed_time = time.time() - start_time
             if elapsed_time > timeout:
@@ -211,7 +214,7 @@ class ElectionMaster(object):
     # Heartbeat to check if replicas are alive
     def heartbeat(self, replicas):
         while True:
-            time.sleep(15)  # Send heartbeat every 15 seconds
+            time.sleep(25)  # Send heartbeat every 25 seconds
 
             try:
                 for replica in replicas:
