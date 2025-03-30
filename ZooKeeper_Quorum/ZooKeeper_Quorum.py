@@ -1,4 +1,5 @@
-import argparse
+﻿import argparse
+import threading
 import time
 from kazoo.client import KazooClient
 from kazoo.recipe.watchers import ChildrenWatch
@@ -28,6 +29,7 @@ class ElectionMaster(object):
         self.data_store = {}  # Dictionary to store key-value pairs and a version associated with it
         self.version = 0
         self.replicas = []  # List of replica addresses
+        self.heartbeat_started = False  # Add flag to track if heartbeat has started
 
     # Destructor
     def __del__(self):
@@ -37,22 +39,26 @@ class ElectionMaster(object):
     # Create a zookeeper node
     def create_node(self):
         node_path = self.zk.create(os.path.join(self.leadernode, "%s_" % self.client_id), b"host:", ephemeral=True, sequence=True, makepath=True)
-        #self.propagate_update(self.data_store)
         print(f"\033[33mCreated node: {node_path}\033[0m")
 
     # Detect the leader depending on the smallest sequence number
     def detectLeader(self, childrens):
         print(f"\033[33mChildrens: {childrens}\033[0m")
 
-        self.host_seq_list = [i.split("_") for i in childrens]
-        sorted_host_seqvalue = sorted(self.host_seq_list, key=operator.itemgetter(1))
-        print(f"\033[33msorted_host_seqvalue: {sorted_host_seqvalue}\033[0m")
+        sorted_host_seqvalue = self.sortReplicas(childrens)
 
         # If sequence number is the smallest, then the client is the leader
         if sorted_host_seqvalue and sorted_host_seqvalue[0][0] == self.client_id:
             print(f"\033[33mI am current leader: {self.client_id}\033[0m")
             # Convert sorted_host_seqvalue back to the desired string format
             self.replicas = [f"{host}" for host, _ in sorted_host_seqvalue[1:]]
+            print(f"\033[35mHeartbeat Started: {self.heartbeat_started}\033[0m")
+            if not self.heartbeat_started:
+                # Starting heartbeat in a separate thread for leader
+                print(f"\033[35mStarting Heartbeat thread.\033[0m")
+                heartbeat_thread = threading.Thread(target=self.heartbeat, args=(self.replicas,), daemon=True)
+                heartbeat_thread.start()
+                self.heartbeat_started = True
             return True
         else:
             print(f"\033[33mI am a worker: {self.client_id}\033[0m")
@@ -60,6 +66,12 @@ class ElectionMaster(object):
             self.replicas = [f"{host}" for host, _ in sorted_host_seqvalue[1:]]
             return False
     
+    def sortReplicas(self, childrens):
+        self.host_seq_list = [i.split("_") for i in childrens]
+        sorted_host_seqvalue = sorted(self.host_seq_list, key=operator.itemgetter(1))
+        print(f"\033[33msorted_host_seqvalue: {sorted_host_seqvalue}\033[0m")
+        return sorted_host_seqvalue
+
     # Propogate updates to replicas
     def propagate_update(self, data_store):
         print(f"\033[33mReplicas: {self.replicas}\033[0m")
@@ -80,7 +92,7 @@ class ElectionMaster(object):
         print(f"\033[33mChecking replicas during read: {self.replicas}\033[0m")
         # For a size of N nodes, a quorom requires votes from at least Nw members. Where Nw >= N/2 + 1.
         N = len(self.replicas)
-        Nw = (N // 2) + 1 # Perform floor division
+        Nw = min((N // 2) + 1, N) # Perform floor division
         valuesArr = []
         Nr = random.sample(self.replicas, Nw) # Randomly select Nr replicas
         count = len(Nr)
@@ -196,6 +208,24 @@ class ElectionMaster(object):
                 print("\033[31mTimeout reached! Exiting read operation.\033[0m")
                 break # Break out of the loop
 
+    # Heartbeat to check if replicas are alive
+    def heartbeat(self, replicas):
+        while True:
+            time.sleep(15)  # Send heartbeat every 15 seconds
+
+            try:
+                for replica in replicas:
+                    url = f"http://{replica}/heartbeat"
+                    response = requests.get(url, timeout=3)
+                    if response.status_code == 200:
+                        print(f"\033[32mHeartbeat successful with replica {replica}\033[0m")
+                        self.propagate_update(self.data_store)
+                    else:
+                        print(f"\033[31mHeartbeat failed with replica {replica}\033[0m")
+            except requests.exceptions.RequestException as e:
+                print(f"\033[31mHeartbeat request error: {e}\033[0m")     
+
+
 # Define GET method route for reading a key-value pair
 @app.route('/read', methods=['GET'])
 def read():
@@ -232,11 +262,17 @@ def timeout():
     detector.timeout()
     return jsonify({"status": "timeout complete"})
 
+# Define GET method route for getting heartbeat of replica
+@app.route('/heartbeat', methods=['GET'])
+def heartbeat():
+    return jsonify({"status": "thump thump"})
+
 # Define GET method route for getting votes
 @app.route('/vote', methods=['GET'])
 def vote():
     vote = True
     return jsonify({"vote": vote})
+
 
 # Main method
 if __name__ == '__main__':

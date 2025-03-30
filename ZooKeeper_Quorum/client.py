@@ -70,32 +70,52 @@ def main():
         # All updates routed through server on the elected leader. Sending through port 5000 as default.
         add_update(host, ports[0], f"key0", f"value0")
 
+        time.sleep(10) # Wait for server to update
+
         for i in range(len(ports)):
             for j in range(len(ports)):
                 print(f"\033[36mFor Port: {ports[i]}\033[0m")
                 read_key(host, ports[i], f"key{j}") # Check existing keys on all ports
+
+        time.sleep(10) # Wait for server to update
 
         print("\033[32mTesting Add and Read Through Replicas...\033[0m")
         # All updates routed through server on the elected leader. Sending through port 5002.
         add_update(host, ports[2], f"key2", f"value2")
 
+        time.sleep(10) # Wait for server to update
+
         for i in range(len(ports)):
             for j in range(len(ports)):
                 print(f"\033[36mFor Port: {ports[i]}\033[0m")
                 read_key(host, ports[i], f"key{j}") # Check existing keys on all ports
 
-        print("\033[32mTesting Leader Election...\033[0m")
+        time.sleep(10) # Wait for server to update
+
+        killReplica = False
+        i = 0
         for port, server in servers:
             response = kill(host, port)
             is_leader = response.get("is_leader", False)
+            if not is_leader:
+                print("\033[32mTesting Replica Restore...\033[0m")
+                print("\033[31mKilling a replica.\033[0m")
+                stop_server(server)
+                killReplica = True
+                start_server(host, port, zookeeper_ip, zookeeper_port)
+                print("\033[33mReading from replica.\033[0m")
+                read_key(host, port, f"key{i}") # Read from killed replica
+                time.sleep(10) # Wait for server to start
+                read_key(host, port, f"key{i}") # Read from killed replica
             if is_leader:
+                print("\033[32mTesting Leader Election...\033[0m")
                 print("\033[31mKilling the leader, electing a new one.\033[0m")
                 stop_server(server)
                 time.sleep(30)  # Wait for new leader election
                 start_server(host, port, zookeeper_ip, zookeeper_port)
-                print("\033[32mTesting Timeout Logic.\033[0m")
+                print("\033[32mTesting Timeout Logic...\033[0m")
                 timeout(host, port) # Enable server timeout.
-
+            i += 1
 
         print("\033[32mTesting Stale Read...\033[0m")
         for i in range(len(ports)):
